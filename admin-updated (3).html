@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vayu-Rescue · Admin Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&family=Bebas+Neue&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    :root {
+      --bg:#03050f; --panel:#060b1a; --card:#0b1228;
+      --cyan:#00d4ff; --amber:#FF9933; --green:#00c853; --red:#ff3d3d;
+      --text:#EEF2FF; --sub:#8892B0; --border:rgba(0,212,255,0.18);
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh;}
+
+    /* LOGIN */
+    #login-screen{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;}
+    .login-box{background:var(--panel);border:1px solid var(--border);padding:40px 48px;width:360px;display:flex;flex-direction:column;gap:16px;position:relative;}
+    .login-box::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--cyan),var(--amber));}
+    .login-title{font-family:'Bebas Neue';font-size:2rem;color:var(--cyan);letter-spacing:0.1em;text-align:center;}
+    .login-sub{font-family:'Share Tech Mono';font-size:0.62rem;color:var(--sub);letter-spacing:0.18em;text-align:center;margin-top:-12px;}
+    .login-input{width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono';font-size:0.85rem;padding:12px 16px;outline:none;letter-spacing:0.1em;transition:border-color 0.2s;}
+    .login-input:focus{border-color:var(--cyan);}
+    .login-btn{width:100%;padding:14px;background:var(--cyan);color:var(--bg);border:none;font-family:'Share Tech Mono';font-size:0.85rem;font-weight:700;letter-spacing:0.15em;cursor:pointer;clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px));transition:all 0.2s;}
+    .login-btn:hover{background:#fff;}
+    .login-err{font-family:'Share Tech Mono';font-size:0.62rem;color:var(--red);text-align:center;display:none;}
+
+    /* DASHBOARD */
+    #dashboard{display:none;}
+    nav{position:sticky;top:0;z-index:500;background:rgba(2,5,8,0.97);border-bottom:1px solid var(--border);padding:0 32px;height:58px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(12px);}
+    .nav-brand{font-family:'Bebas Neue';font-size:1.4rem;color:var(--cyan);letter-spacing:0.12em;}
+    .nav-brand span{color:var(--amber);}
+    .nav-right{display:flex;align-items:center;gap:16px;}
+    .nav-status{font-family:'Share Tech Mono';font-size:0.62rem;color:var(--green);display:flex;align-items:center;gap:7px;}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite;}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.7)}}
+    .logout-btn{font-family:'Share Tech Mono';font-size:0.62rem;letter-spacing:0.1em;padding:6px 16px;background:transparent;border:1px solid rgba(255,61,61,0.4);color:var(--red);cursor:pointer;transition:all 0.2s;}
+    .logout-btn:hover{background:rgba(255,61,61,0.1);}
+
+    .dash-body{padding:28px 32px;max-width:1500px;margin:0 auto;}
+
+    /* STATS */
+    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px;}
+    .stat-box{background:var(--panel);border:1px solid var(--border);padding:20px 22px;position:relative;overflow:hidden;}
+    .stat-box::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;}
+    .stat-box.cyan::before{background:var(--cyan);}
+    .stat-box.amber::before{background:var(--amber);}
+    .stat-box.green::before{background:var(--green);}
+    .stat-box.red::before{background:var(--red);}
+    .stat-num{font-family:'Share Tech Mono';font-size:2.2rem;line-height:1;}
+    .stat-box.cyan .stat-num{color:var(--cyan);}
+    .stat-box.amber .stat-num{color:var(--amber);}
+    .stat-box.green .stat-num{color:var(--green);}
+    .stat-box.red .stat-num{color:var(--red);}
+    .stat-lbl{font-family:'Share Tech Mono';font-size:0.58rem;color:var(--sub);letter-spacing:0.15em;margin-top:6px;}
+
+    /* TABS */
+    .tab-row{display:flex;gap:0;margin-bottom:0;}
+    .tab-btn{font-family:'Share Tech Mono';font-size:0.7rem;letter-spacing:0.12em;padding:11px 24px;background:var(--panel);color:var(--sub);border:1px solid var(--border);border-bottom:none;cursor:pointer;transition:all 0.2s;text-transform:uppercase;}
+    .tab-btn:not(:first-child){border-left:none;}
+    .tab-btn.active{background:var(--card);color:var(--cyan);border-color:rgba(0,212,255,0.45);}
+    .tab-content{display:none;background:var(--card);border:1px solid rgba(0,212,255,0.25);padding:24px;margin-top:-1px;}
+    .tab-content.active{display:block;}
+    .tab-content.map-tab{padding:0;}
+
+    /* TABLES */
+    .section-label{font-family:'Share Tech Mono';font-size:0.62rem;letter-spacing:0.2em;color:var(--amber);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+    .refresh-btn{font-family:'Share Tech Mono';font-size:0.58rem;padding:5px 14px;background:transparent;border:1px solid var(--border);color:var(--cyan);cursor:pointer;letter-spacing:0.1em;transition:all 0.15s;}
+    .refresh-btn:hover{border-color:var(--cyan);background:rgba(0,212,255,0.05);}
+    table{width:100%;border-collapse:collapse;}
+    thead tr{border-bottom:1px solid rgba(0,212,255,0.25);}
+    th{font-family:'Share Tech Mono';font-size:0.58rem;letter-spacing:0.15em;color:var(--sub);padding:8px 14px;text-align:left;text-transform:uppercase;}
+    tbody tr{border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s;}
+    tbody tr:hover{background:rgba(0,212,255,0.03);}
+    td{font-family:'Share Tech Mono';font-size:0.68rem;color:var(--text);padding:10px 14px;}
+    td.dim{color:var(--sub);font-size:0.6rem;}
+    .badge{display:inline-block;font-family:'Share Tech Mono';font-size:0.55rem;padding:2px 8px;letter-spacing:0.1em;}
+    .badge.active  {background:rgba(255,61,61,0.12);border:1px solid rgba(255,61,61,0.35);color:var(--red);}
+    .badge.approved{background:rgba(0,200,83,0.12); border:1px solid rgba(0,200,83,0.35); color:var(--green);}
+    .badge.rejected{background:rgba(136,146,176,0.1);border:1px solid rgba(136,146,176,0.3);color:var(--sub);}
+    .badge.person  {background:rgba(0,212,255,0.1); border:1px solid rgba(0,212,255,0.3); color:var(--cyan);}
+    .badge.cam     {background:rgba(255,153,51,0.1);border:1px solid rgba(255,153,51,0.3);color:var(--amber);}
+    .empty-state{text-align:center;padding:48px 20px;font-family:'Share Tech Mono';font-size:0.68rem;color:var(--sub);letter-spacing:0.1em;line-height:2.5;}
+    .empty-icon{font-size:2.5rem;opacity:0.25;display:block;margin-bottom:8px;}
+    .export-btn{font-family:'Share Tech Mono';font-size:0.65rem;letter-spacing:0.12em;padding:8px 20px;background:transparent;border:1px solid rgba(0,200,83,0.4);color:var(--green);cursor:pointer;transition:all 0.2s;}
+    .export-btn:hover{background:rgba(0,200,83,0.08);}
+    #last-sync{font-family:'Share Tech Mono';font-size:0.55rem;color:rgba(136,146,176,0.45);letter-spacing:0.08em;}
+    .search-input{width:220px;background:var(--panel);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono';font-size:0.68rem;padding:8px 12px;outline:none;letter-spacing:0.06em;}
+    .search-input:focus{border-color:var(--cyan);}
+
+    /* APPROVE/REJECT BUTTONS */
+    .approve-btn{font-family:'Share Tech Mono';font-size:0.55rem;letter-spacing:0.08em;padding:5px 12px;background:rgba(0,200,83,0.1);border:1px solid rgba(0,200,83,0.45);color:var(--green);cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+    .approve-btn:hover{background:rgba(0,200,83,0.2);}
+    .reject-btn{font-family:'Share Tech Mono';font-size:0.55rem;letter-spacing:0.08em;padding:5px 10px;background:rgba(255,61,61,0.08);border:1px solid rgba(255,61,61,0.35);color:var(--red);cursor:pointer;transition:all 0.15s;margin-left:4px;}
+    .reject-btn:hover{background:rgba(255,61,61,0.15);}
+
+    /* PENDING BADGE ON TAB */
+    .pending-count{display:inline-block;background:var(--amber);color:#000;font-family:'Share Tech Mono';font-size:0.5rem;padding:1px 6px;margin-left:8px;vertical-align:middle;}
+
+    /* DRONE MAP LAYOUT */
+    .map-shell{display:grid;grid-template-columns:300px 1fr;height:640px;}
+    .map-sidebar{background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+    .map-sidebar-hdr{padding:14px 18px;border-bottom:1px solid var(--border);font-family:'Share Tech Mono';font-size:0.62rem;letter-spacing:0.15em;color:var(--amber);}
+    .map-sidebar-hdr small{color:var(--sub);font-size:0.52rem;display:block;margin-top:3px;letter-spacing:0.08em;}
+    .mission-list{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:7px;}
+    .mission-list::-webkit-scrollbar{width:3px;}
+    .mission-list::-webkit-scrollbar-thumb{background:var(--border);}
+    .mission-card{background:var(--card);border:1px solid var(--border);padding:11px 13px;cursor:pointer;transition:border-color 0.15s;position:relative;}
+    .mission-card:hover{border-color:rgba(0,212,255,0.35);}
+    .mission-card.sel{border-color:var(--cyan);box-shadow:0 0 10px rgba(0,212,255,0.1);}
+    .mission-card.appr{border-color:rgba(0,200,83,0.3);}
+    .mc-refid{font-family:'Share Tech Mono';font-size:0.6rem;color:var(--cyan);margin-bottom:3px;}
+    .mc-name{font-family:'Rajdhani';font-size:0.92rem;font-weight:600;color:var(--text);margin-bottom:2px;}
+    .mc-loc{font-family:'Share Tech Mono';font-size:0.52rem;color:var(--sub);margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .mc-badge{position:absolute;top:8px;right:8px;font-family:'Share Tech Mono';font-size:0.48rem;padding:2px 6px;}
+    .mc-pending {background:rgba(255,153,51,0.1);border:1px solid rgba(255,153,51,0.35);color:var(--amber);}
+    .mc-approved{background:rgba(0,200,83,0.1);  border:1px solid rgba(0,200,83,0.35);  color:var(--green);}
+    .mc-rejected{background:rgba(136,146,176,0.1);border:1px solid rgba(136,146,176,0.3);color:var(--sub);}
+    .mc-actions{display:flex;gap:5px;}
+    .mc-approve-btn{font-family:'Share Tech Mono';font-size:0.52rem;padding:4px 10px;background:rgba(0,200,83,0.1);border:1px solid rgba(0,200,83,0.4);color:var(--green);cursor:pointer;flex:1;transition:all 0.15s;}
+    .mc-approve-btn:hover{background:rgba(0,200,83,0.2);}
+    .mc-reject-btn{font-family:'Share Tech Mono';font-size:0.52rem;padding:4px 8px;background:rgba(255,61,61,0.08);border:1px solid rgba(255,61,61,0.3);color:var(--red);cursor:pointer;transition:all 0.15s;}
+    .mc-reject-btn:hover{background:rgba(255,61,61,0.15);}
+    .map-legend{padding:12px 18px;border-top:1px solid var(--border);}
+    .legend-title{font-family:'Share Tech Mono';font-size:0.55rem;color:var(--amber);letter-spacing:0.15em;margin-bottom:7px;}
+    .legend-row{display:flex;align-items:center;gap:8px;font-family:'Share Tech Mono';font-size:0.52rem;color:var(--sub);margin-bottom:5px;}
+    .legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+
+    #drone-map{width:100%;height:100%;background:#020a0e;}
+
+    /* Leaflet dark popup */
+    .leaflet-popup-content-wrapper{background:var(--card)!important;border:1px solid var(--border)!important;border-radius:0!important;box-shadow:0 4px 24px rgba(0,0,0,0.7)!important;color:var(--text)!important;}
+    .leaflet-popup-tip{background:var(--card)!important;}
+    .leaflet-popup-content{font-family:'Share Tech Mono',monospace;font-size:0.68rem;line-height:1.8;color:var(--text);}
+    .leaflet-container{background:#020a0e!important;}
+    .leaflet-bar a{background:var(--card)!important;color:var(--cyan)!important;border-color:var(--border)!important;}
+    .leaflet-bar a:hover{background:var(--panel)!important;}
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-title">VAYU-RESCUE</div>
+    <div class="login-sub">ADMIN COMMAND CENTRE · SECURE ACCESS</div>
+    <input class="login-input" type="text"     id="login-user" placeholder="USERNAME" autocomplete="off"/>
+    <input class="login-input" type="password" id="login-pass" placeholder="PASSWORD" onkeydown="if(event.key==='Enter')doLogin()"/>
+    <button class="login-btn" onclick="doLogin()">▶ AUTHENTICATE</button>
+    <div class="login-err" id="login-err">⛔ Invalid credentials</div>
+    <div style="font-family:'Share Tech Mono';font-size:0.5rem;color:rgba(136,146,176,0.3);text-align:center;margin-top:4px;letter-spacing:0.1em;">DEFAULT: admin / vayu2026</div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <nav>
+    <div class="nav-brand">VAYU-RESCUE <span>ADMIN</span></div>
+    <div class="nav-right">
+      <div class="nav-status"><div class="dot"></div><span id="db-conn-label">CONNECTING…</span></div>
+      <div id="last-sync">—</div>
+      <button class="logout-btn" onclick="doLogout()">LOGOUT</button>
+    </div>
+  </nav>
+
+  <div class="dash-body">
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-box cyan"> <div class="stat-num" id="stat-persons">—</div><div class="stat-lbl">UNIQUE PERSONS CAPTURED</div></div>
+      <div class="stat-box amber"><div class="stat-num" id="stat-reports">—</div><div class="stat-lbl">DISASTER REPORTS FILED</div></div>
+      <div class="stat-box green"><div class="stat-num" id="stat-today">—</div>  <div class="stat-lbl">CAPTURES TODAY</div></div>
+      <div class="stat-box red">  <div class="stat-num" id="stat-active">—</div> <div class="stat-lbl">ACTIVE MISSING REPORTS</div></div>
+    </div>
+    <div class="stats-row" style="grid-template-columns:repeat(2,1fr);">
+      <div class="stat-box amber"><div class="stat-num" id="stat-pending-reports">—</div><div class="stat-lbl">PENDING APPROVAL</div></div>
+      <div class="stat-box red">  <div class="stat-num" id="stat-duplicates">—</div>    <div class="stat-lbl">DUPLICATE REPORTS FLAGGED</div></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-row">
+      <button class="tab-btn active" onclick="switchTab('persons')">👤 CAPTURED PERSONS</button>
+      <button class="tab-btn"        onclick="switchTab('reports')">🆘 DISASTER REPORTS</button>
+      <button class="tab-btn"        onclick="switchTab('missing')">🔴 MISSING PERSONS <span class="pending-count" id="missing-pending-count">0</span></button>
+      <button class="tab-btn"        onclick="switchTab('map')">🗺 DRONE DISPATCH MAP <span class="pending-count" id="pending-count">0</span></button>
+    </div>
+
+    <!-- TAB: Persons -->
+    <div class="tab-content active" id="tab-persons">
+      <div class="section-label">
+        <span>📸 UNIQUE PERSONS DETECTED — AUTO-CAPTURED FROM LIVE / REMOTE CAMERA</span>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <input class="search-input" id="search-persons" placeholder="Search ID / time…" oninput="filterPersons()"/>
+          <button class="refresh-btn" onclick="loadPersons()">↺ REFRESH</button>
+          <button class="export-btn"  onclick="exportCSV('persons')">↓ EXPORT CSV</button>
+        </div>
+      </div>
+      <table><thead><tr><th>PHOTO</th><th>ID</th><th>TIMESTAMP</th><th>SOURCE</th><th>BBOX (X·Y·W·H)</th><th>SAVED AT</th></tr></thead>
+      <tbody id="persons-tbody"><tr><td colspan="6"><div class="empty-state"><span class="empty-icon">📡</span>Loading from Firebase…</div></td></tr></tbody></table>
+    </div>
+
+    <!-- TAB: Reports -->
+    <div class="tab-content" id="tab-reports">
+      <div class="section-label">
+        <span>🆘 MISSING PERSONS & DISASTER REPORTS — FILED VIA VAYU-RESCUE PORTAL</span>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <input class="search-input" id="search-reports" placeholder="Search name / location…" oninput="filterReports()"/>
+          <button class="refresh-btn" onclick="loadReports()">↺ REFRESH</button>
+          <button class="export-btn"  onclick="exportCSV('reports')">↓ EXPORT CSV</button>
+        </div>
+      </div>
+      <table><thead><tr>
+        <th>REF ID</th><th>NAME / TYPE</th><th>AGE</th><th>LOCATION</th>
+        <th>DESCRIPTION</th><th>DISASTER TYPE</th><th>SEVERITY</th>
+        <th>CONTACT</th><th>TIME</th><th>STATUS</th><th>ACTION</th>
+      </tr></thead>
+      <tbody id="reports-tbody"><tr><td colspan="11"><div class="empty-state"><span class="empty-icon">📋</span>Loading from Firebase…</div></td></tr></tbody></table>
+    </div>
+
+    <!-- TAB: Missing Persons Reports -->
+    <div class="tab-content" id="tab-missing">
+      <div class="section-label">
+        <span>🔴 MISSING PERSON REPORTS — FILED VIA PUBLIC PORTAL · REQUIRES ADMIN APPROVAL</span>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <input class="search-input" id="search-missing" placeholder="Search name / phone…" oninput="filterMissing()"/>
+          <button class="refresh-btn" onclick="renderMissingTab()">↺ REFRESH</button>
+          <button class="export-btn"  onclick="exportMissingCSV()">↓ EXPORT CSV</button>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div style="display:flex;gap:14px;margin-bottom:18px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:6px;font-family:'Share Tech Mono';font-size:0.58rem;color:var(--sub);">
+          <span style="display:inline-block;padding:2px 8px;border:1px solid rgba(255,153,51,0.4);background:rgba(255,153,51,0.1);color:var(--amber);">PENDING</span> Awaiting admin review
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-family:'Share Tech Mono';font-size:0.58rem;color:var(--sub);">
+          <span style="display:inline-block;padding:2px 8px;border:1px solid rgba(255,61,61,0.5);background:rgba(255,61,61,0.12);color:var(--red);">⚠ DUPLICATE</span> Name + Age + Phone all match an existing entry — needs approval
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-family:'Share Tech Mono';font-size:0.58rem;color:var(--sub);">
+          <span style="display:inline-block;padding:2px 8px;border:1px solid rgba(0,200,83,0.35);background:rgba(0,200,83,0.1);color:var(--green);">APPROVED</span> Verified & activated
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-family:'Share Tech Mono';font-size:0.58rem;color:var(--sub);">
+          <span style="display:inline-block;padding:2px 8px;border:1px solid rgba(136,146,176,0.3);background:rgba(136,146,176,0.08);color:var(--sub);">REJECTED</span> Dismissed
+        </div>
+      </div>
+
+      <table id="missing-table">
+        <thead><tr>
+          <th>#</th>
+          <th>REF ID</th>
+          <th>NAME</th>
+          <th>AGE</th>
+          <th>PHONE / CONTACT</th>
+          <th>DESCRIPTION</th>
+          <th>REPORTED AT</th>
+          <th>STATUS</th>
+          <th>ACTION</th>
+        </tr></thead>
+        <tbody id="missing-tbody">
+          <tr><td colspan="9"><div class="empty-state"><span class="empty-icon">📡</span>Loading from Firebase…</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- TAB: Drone Dispatch Map -->
+    <div class="tab-content map-tab" id="tab-map">
+      <div class="map-shell">
+
+        <!-- Sidebar -->
+        <div class="map-sidebar">
+          <div class="map-sidebar-hdr">
+            🚁 DRONE MISSION CONTROL
+            <small>Approve a report to dispatch drone &amp; mark on map</small>
+          </div>
+          <div class="mission-list" id="mission-list">
+            <div class="empty-state" style="padding:32px 12px;"><span class="empty-icon">📋</span>No reports yet</div>
+          </div>
+          <div class="map-legend">
+            <div class="legend-title">MAP LEGEND</div>
+            <div class="legend-row"><div class="legend-dot" style="background:#FF9933;box-shadow:0 0 5px #FF9933;"></div>VAYU-RESCUE DRONE BASE</div>
+            <div class="legend-row"><div class="legend-dot" style="background:#00c853;box-shadow:0 0 5px #00c853;"></div>APPROVED · DRONE DISPATCHED</div>
+            <div class="legend-row"><div class="legend-dot" style="background:rgba(136,146,176,0.5);"></div>PENDING ADMIN APPROVAL</div>
+          </div>
+        </div>
+
+        <!-- Map -->
+        <div id="drone-map"></div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyAA_n5JHWSrMJKV0cY2LatoqDgtbzhEfFo",
+    authDomain:        "uniqueperson.firebaseapp.com",
+    databaseURL:       "https://uniqueperson-default-rtdb.firebaseio.com",
+    projectId:         "uniqueperson",
+    storageBucket:     "uniqueperson.firebasestorage.app",
+    messagingSenderId: "947355282541",
+    appId:             "1:947355282541:web:0dacc1fb09035edcf7e364"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+
+  // ── Drone base ──
+  const BASE_LAT = 31.264252752621662;
+  const BASE_LNG = 75.69529079457683;
+
+  // ── State ──
+  let allPersons = [];
+  let allReports = [];
+  let reportKeys = {};       // refId → firebase push key
+  let droneMap   = null;
+  let mapReady   = false;
+  let missionPins = {};      // refId → { marker, line }
+  let pendingPins = {};      // refId → marker (grey, no line — pending)
+
+  // ══════════════════════════════
+  // LOGIN / LOGOUT
+  // ══════════════════════════════
+  window.doLogin = function() {
+    const u = document.getElementById('login-user').value.trim();
+    const p = document.getElementById('login-pass').value.trim();
+    const err = document.getElementById('login-err');
+    if (u === 'admin' && p === 'vayu2026') {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      initDashboard();
+    } else {
+      err.style.display = 'block';
+      setTimeout(() => err.style.display = 'none', 2000);
+    }
+  };
+  window.doLogout = function() {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('dashboard').style.display = 'none';
+  };
+
+  // ══════════════════════════════
+  // TAB SWITCHING
+  // ══════════════════════════════
+  window.switchTab = function(name) {
+    const tabs = ['persons','reports','missing','map'];
+    tabs.forEach((t,i) => {
+      document.querySelectorAll('.tab-btn')[i].classList.toggle('active', t === name);
+      document.getElementById('tab-' + t).classList.toggle('active', t === name);
+    });
+    if (name === 'map') setTimeout(ensureMap, 80);
+    if (name === 'missing') renderMissingTab();
+  };
+
+  // ══════════════════════════════
+  // INIT DASHBOARD
+  // ══════════════════════════════
+  function initDashboard() {
+    const connLabel = document.getElementById('db-conn-label');
+
+    // Persons listener
+    onValue(ref(db, 'vayu_rescue/captured_persons'), snap => {
+      connLabel.textContent = 'FIREBASE LIVE ✓';
+      const data = snap.val() || {};
+      allPersons = Object.values(data).sort((a,b) => (b.savedAt||'').localeCompare(a.savedAt||''));
+      renderPersons(allPersons);
+      updateStats();
+      document.getElementById('last-sync').textContent = 'LAST SYNC: ' + new Date().toLocaleTimeString();
+    }, e => { connLabel.textContent = '⚠ DB ERROR: ' + e.message; });
+
+    // Reports listener
+    onValue(ref(db, 'vayu_rescue/disaster_reports'), snap => {
+      const data = snap.val() || {};
+      reportKeys = {};
+      allReports = [];
+      Object.entries(data).forEach(([key, val]) => {
+        reportKeys[val.refId] = key;
+        allReports.push(val);
+      });
+      allReports.sort((a,b) => (b.savedAt||'').localeCompare(a.savedAt||''));
+      renderReports(allReports);
+      renderMissionList();
+      if (document.getElementById('tab-missing').classList.contains('active')) renderMissingTab();
+      updateStats();
+      if (mapReady) syncAllPins();
+    });
+  }
+
+  // ══════════════════════════════
+  // STATS
+  // ══════════════════════════════
+  function updateStats() {
+    document.getElementById('stat-persons').textContent = allPersons.length;
+    document.getElementById('stat-reports').textContent = allReports.length;
+    document.getElementById('stat-active').textContent  = allReports.filter(r => r.status === 'ACTIVE').length;
+    const today = new Date().toISOString().slice(0,10);
+    document.getElementById('stat-today').textContent   = allPersons.filter(p => (p.savedAt||'').startsWith(today)).length;
+    const pending = allReports.filter(r => !r.status || r.status === 'ACTIVE').length;
+    document.getElementById('pending-count').textContent = pending;
+
+    // Missing person reports stats (MP- prefix only, not VR- disaster reports)
+    const missingReports = allReports.filter(r => r.refId && r.refId.startsWith('MP-'));
+    const pendingMissing = missingReports.filter(r => !r.status || r.status === 'ACTIVE' || r.status === 'DUPLICATE').length;
+    const duplicates = missingReports.filter(r => isDuplicate(r, missingReports)).length;
+    document.getElementById('stat-pending-reports').textContent = pendingMissing;
+    document.getElementById('stat-duplicates').textContent = duplicates;
+    document.getElementById('missing-pending-count').textContent = pendingMissing;
+  }
+
+  // ══════════════════════════════
+  // RENDER PERSONS TABLE
+  // ══════════════════════════════
+  function renderPersons(list) {
+    const tbody = document.getElementById('persons-tbody');
+    if (!list.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><span class="empty-icon">👤</span>No persons captured yet.</div></td></tr>'; return; }
+    tbody.innerHTML = list.map(p => `<tr>
+      <td>${p.thumb ? `<img src="${p.thumb}" style="width:48px;height:64px;object-fit:cover;border:1px solid rgba(0,212,255,0.3);" loading="lazy">` : '<span style="font-size:0.52rem;color:var(--sub);">NO PHOTO</span>'}</td>
+      <td><span class="badge person">${p.id||'—'}</span></td>
+      <td>${p.timestamp||'—'}</td>
+      <td><span class="badge cam">${(p.source||'live_cam').replace('_',' ').toUpperCase()}</span></td>
+      <td class="dim">${p.bbox_x??'—'} · ${p.bbox_y??'—'} · ${p.bbox_w??'—'} · ${p.bbox_h??'—'}</td>
+      <td class="dim">${p.savedAt ? new Date(p.savedAt).toLocaleString('en-IN') : '—'}</td>
+    </tr>`).join('');
+  }
+
+  // ══════════════════════════════
+  // RENDER REPORTS TABLE
+  // ══════════════════════════════
+  function renderReports(list) {
+    const tbody = document.getElementById('reports-tbody');
+    if (!list.length) { tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><span class="empty-icon">🆘</span>No reports filed yet.</div></td></tr>'; return; }
+    tbody.innerHTML = list.map(r => {
+      const st = r.status || 'ACTIVE';
+      const sevColor = r.severity === 'CRITICAL' ? 'color:var(--red);border-color:rgba(255,61,61,0.4);'
+                     : r.severity === 'MEDIUM'   ? 'color:var(--amber);border-color:rgba(255,153,51,0.4);'
+                     :                             'color:var(--green);border-color:rgba(0,200,83,0.4);';
+
+      // Geo-conflict check: only relevant for pending VR- reports that have coords
+      const conflict = (st !== 'APPROVED' && st !== 'REJECTED') ? getGeoConflict(r) : null;
+
+      let statusBadge;
+      if (conflict || st === 'GEO_CONFLICT') {
+        statusBadge = `<span style="display:inline-block;padding:2px 8px;font-family:'Share Tech Mono';font-size:0.52rem;letter-spacing:0.06em;background:rgba(255,61,61,0.15);border:1px solid rgba(255,61,61,0.5);color:var(--red);animation:pulse 1.5s infinite;">⚠ GEO-CONFLICT</span>`;
+      } else {
+        statusBadge = `<span class="badge ${st === 'APPROVED' ? 'approved' : st === 'REJECTED' ? 'rejected' : 'active'}">${st === 'GEO_CONFLICT' ? 'BLOCKED' : st}</span>`;
+      }
+
+      let actionCell;
+      if (st === 'APPROVED') {
+        actionCell = `<span style="color:var(--green);font-family:'Share Tech Mono';font-size:0.58rem;">✓ DISPATCHED</span>`;
+      } else if (st === 'REJECTED') {
+        actionCell = `<span style="color:var(--sub);font-family:'Share Tech Mono';font-size:0.58rem;">✗ REJECTED</span>`;
+      } else if (conflict) {
+        // Blocked — wrong disaster type within 100m of an approved location
+        actionCell = `<span style="font-family:'Share Tech Mono';font-size:0.52rem;color:var(--red);display:block;max-width:200px;line-height:1.5;">
+          ⛔ Blocked: <strong>${conflict.disasterType.toUpperCase()}</strong> already approved<br>
+          <span style="opacity:0.7;">${haversineMeters(r.lat,r.lng,conflict.lat,conflict.lng).toFixed(0)} m from ${conflict.refId}</span><br>
+          <button class="reject-btn" style="margin-top:4px;" onclick="rejectReport('${r.refId}')">✗ DISMISS</button>
+        </span>`;
+      } else {
+        actionCell = `<button class="approve-btn" onclick="approveReport('${r.refId}')">✓ APPROVE &amp; DISPATCH</button>
+                      <button class="reject-btn"  onclick="rejectReport('${r.refId}')">✗ REJECT</button>`;
+      }
+
+      // Conflict warning row
+      const conflictRow = conflict
+        ? `<tr style="background:rgba(255,61,61,0.05);">
+            <td colspan="11" style="padding:5px 14px 8px 22px;">
+              <div style="font-family:'Share Tech Mono';font-size:0.57rem;color:var(--red);letter-spacing:0.05em;">
+                ⚠ GEO-CONFLICT: This report is <strong>${haversineMeters(r.lat,r.lng,conflict.lat,conflict.lng).toFixed(0)} m</strong> from approved report
+                <span style="color:var(--cyan);">${conflict.refId}</span> which is a
+                <strong>${conflict.disasterType.toUpperCase()}</strong> disaster.
+                A <strong>${r.disasterType.toUpperCase()}</strong> cannot coexist within 100 m of a
+                <strong>${conflict.disasterType.toUpperCase()}</strong>. Dismiss this report or verify the location.
+              </div>
+            </td>
+           </tr>`
+        : '';
+
+      return `<tr style="${conflict ? 'background:rgba(255,61,61,0.03);border-left:3px solid var(--red);' : ''}">
+        <td><span style="color:var(--cyan);font-size:0.65rem;">${r.refId||'—'}</span></td>
+        <td style="font-weight:600;">${r.name||'—'}</td>
+        <td class="dim">${r.age||'—'}</td>
+        <td>${r.location||'—'}</td>
+        <td class="dim" style="max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.desc||'—'}</td>
+        <td class="dim">${r.disasterType ? `<span class="badge cam" style="${conflict?'background:rgba(255,61,61,0.15);border-color:rgba(255,61,61,0.5);color:var(--red);':''}">${r.disasterType.toUpperCase()}</span>` : '—'}</td>
+        <td class="dim">${r.severity ? `<span style="font-family:'Share Tech Mono';font-size:0.55rem;padding:2px 8px;border:1px solid;${sevColor}">${r.severity}</span>` : '—'}</td>
+        <td class="dim">${r.contact||'—'}</td>
+        <td class="dim">${r.timestamp||'—'}</td>
+        <td>${statusBadge}</td>
+        <td style="white-space:nowrap;">${actionCell}</td>
+      </tr>${conflictRow}`;
+    }).join('');
+  }
+
+  // ══════════════════════════════
+  // APPROVE / REJECT
+  // ══════════════════════════════
+  window.approveReport = async function(refId) {
+    const fbKey = reportKeys[refId];
+    if (!fbKey) return;
+    const report = allReports.find(r => r.refId === refId);
+    if (!report) return;
+
+    // If report already has coords, run geo-conflict check before approving
+    if (report.lat && report.lng) {
+      const conflict = getGeoConflict(report);
+      if (conflict) {
+        const dist = haversineMeters(report.lat, report.lng, conflict.lat, conflict.lng).toFixed(0);
+        alert(`⚠ GEO-CONFLICT: Cannot approve.\n\nThis ${report.disasterType||'disaster'} report is only ${dist}m from approved report ${conflict.refId} (${conflict.disasterType}).\n\nWithin 100m, only the same disaster type is valid. Dismiss this report or verify the location.`);
+        return;
+      }
+    }
+
+    // Mark approved in Firebase
+    const rref = ref(db, 'vayu_rescue/disaster_reports/' + fbKey);
+    await update(rref, { status: 'APPROVED', approvedAt: new Date().toISOString() });
+
+    // Geocode location and store lat/lng — then re-check geo-conflict with real coords
+    const coords = await geocode(report.location || report.loc || '');
+    if (coords) {
+      // Temporarily assign coords to run conflict check
+      const tempReport = { ...report, lat: coords.lat, lng: coords.lng };
+      const postConflict = getGeoConflict(tempReport);
+      if (postConflict) {
+        const dist = haversineMeters(coords.lat, coords.lng, postConflict.lat, postConflict.lng).toFixed(0);
+        // Revert approval — conflict found after geocoding
+        await update(rref, { status: 'GEO_CONFLICT', geoConflictWith: postConflict.refId, conflictDist: dist, lat: coords.lat, lng: coords.lng });
+        alert(`⚠ GEO-CONFLICT DETECTED after geocoding:\n\nThis ${report.disasterType||'disaster'} report is ${dist}m from ${postConflict.refId} (${postConflict.disasterType}).\nApproval has been blocked. Please dismiss this report.`);
+        return;
+      }
+      await update(rref, { lat: coords.lat, lng: coords.lng });
+    }
+    // onValue listener will re-render and sync pins automatically
+  };
+
+  window.rejectReport = async function(refId) {
+    const fbKey = reportKeys[refId];
+    if (!fbKey) return;
+    await update(ref(db, 'vayu_rescue/disaster_reports/' + fbKey), { status: 'REJECTED' });
+  };
+
+  // ══════════════════════════════
+  // GEOCODE (Nominatim — free)
+  // ══════════════════════════════
+  async function geocode(locStr) {
+    if (!locStr) return null;
+    // Already coordinate format: "31.2539°N, 75.6924°E" or "31.25, 75.69"
+    const m = locStr.match(/([\d.]+)\s*[°]?\s*[NS]?,?\s*([\d.]+)\s*[°]?\s*[EW]?/i);
+    if (m && parseFloat(m[1]) > 0) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+    // Nominatim text search
+    try {
+      const q = locStr.toLowerCase().includes('india') ? locStr : locStr + ', India';
+      const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q),
+        { headers: { 'Accept-Language': 'en', 'User-Agent': 'VayuRescue-Admin/1.0' } });
+      const data = await res.json();
+      if (data && data[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    } catch(e) {}
+    return null;
+  }
+
+  // ══════════════════════════════
+  // DUPLICATE DETECTION
+  // A report is a DUPLICATE if another APPROVED or ACTIVE report
+  // has the exact same name + age + contact (all 3 fields non-empty and matching).
+  // ══════════════════════════════
+  function normalize(s) { return (s||'').toString().trim().toLowerCase().replace(/\s+/g,' '); }
+
+  function isDuplicate(report, list) {
+    const n = normalize(report.name);
+    const a = normalize(report.age);
+    const c = normalize(report.contact);
+    if (!n || !a || !c) return false; // can't be a dup if any field is empty
+    return list.some(r => {
+      if (r === report || r.refId === report.refId) return false;
+      // Only compare against other MP- reports, ignore VR- disaster reports
+      if (!r.refId || !r.refId.startsWith('MP-')) return false;
+      // Only count APPROVED or ACTIVE (not REJECTED) as the "existing" entry
+      if (r.status === 'REJECTED') return false;
+      return normalize(r.name) === n && normalize(r.age) === a && normalize(r.contact) === c;
+    });
+  }
+
+  // ══════════════════════════════
+  // GEO-CONFLICT DETECTION
+  // A VR- report is GEO-CONFLICTING if it is within 100 m of an APPROVED report
+  // that has a DIFFERENT disasterType. Within 100 m, only the same disaster type
+  // is physically possible. Reports beyond 100 m are always independent.
+  // ══════════════════════════════
+  function haversineMeters(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  // Returns the conflicting approved report, or null if no conflict
+  function getGeoConflict(report) {
+    if (!report.lat || !report.lng || !report.disasterType) return null;
+    const typeA = (report.disasterType || '').trim().toLowerCase();
+    return allReports.find(r => {
+      if (r.refId === report.refId) return false;
+      if (r.status !== 'APPROVED') return false;
+      if (!r.lat || !r.lng || !r.disasterType) return false;
+      const typeB = (r.disasterType || '').trim().toLowerCase();
+      if (typeA === typeB) return false; // same type = fine, more people need help
+      const dist = haversineMeters(report.lat, report.lng, r.lat, r.lng);
+      return dist <= 100;
+    }) || null;
+  }
+
+  // ══════════════════════════════
+  // RENDER MISSING PERSONS TAB
+  // ══════════════════════════════
+  // Only show genuine missing person reports (refId starts with MP-)
+  function getMissingReports() {
+    return allReports.filter(r => r.refId && r.refId.startsWith('MP-'));
+  }
+
+  window.filterMissing = function() {
+    const q = document.getElementById('search-missing').value.toLowerCase();
+    const filtered = getMissingReports().filter(r =>
+      (r.name||'').toLowerCase().includes(q) ||
+      (r.contact||'').toLowerCase().includes(q) ||
+      (r.refId||'').toLowerCase().includes(q)
+    );
+    renderMissingTable(filtered);
+  };
+
+  window.renderMissingTab = function() {
+    renderMissingTable(getMissingReports());
+  };
+
+  function renderMissingTable(list) {
+    const tbody = document.getElementById('missing-tbody');
+    if (!tbody) return;
+    if (!list || !list.length) {
+      tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><span class="empty-icon">🔴</span>No missing person reports yet.<br><span style="font-size:0.55rem;opacity:0.5;">Reports filed via the public portal will appear here.</span></div></td></tr>';
+      return;
+    }
+
+    // Sort: DUPLICATE first, then ACTIVE/pending, then APPROVED, then REJECTED
+    const order = { 'DUPLICATE': 0, 'ACTIVE': 1, 'APPROVED': 2, 'REJECTED': 3 };
+    const sorted = [...list].sort((a,b) => {
+      const aD = isDuplicate(a, allReports) ? 0 : (order[a.status]??1);
+      const bD = isDuplicate(b, allReports) ? 0 : (order[b.status]??1);
+      return aD - bD;
+    });
+
+    tbody.innerHTML = sorted.map((r, idx) => {
+      const dup = isDuplicate(r, allReports);
+      const st  = r.status || 'ACTIVE';
+      const rowStyle = dup ? 'background:rgba(255,61,61,0.04);border-left:3px solid var(--red);' : '';
+
+      // Status badge
+      let statusBadge;
+      if (dup && st !== 'APPROVED' && st !== 'REJECTED') {
+        statusBadge = `<span style="display:inline-block;padding:3px 9px;font-family:'Share Tech Mono';font-size:0.55rem;letter-spacing:0.08em;background:rgba(255,61,61,0.15);border:1px solid rgba(255,61,61,0.5);color:var(--red);animation:pulse 1.5s infinite;">⚠ DUPLICATE</span>`;
+      } else if (st === 'APPROVED') {
+        statusBadge = `<span class="badge approved">APPROVED</span>`;
+      } else if (st === 'REJECTED') {
+        statusBadge = `<span class="badge rejected">REJECTED</span>`;
+      } else {
+        statusBadge = `<span class="badge active">PENDING</span>`;
+      }
+
+      // Highlight duplicate fields
+      const nameStyle  = dup ? 'color:var(--red);font-weight:700;' : 'font-weight:600;';
+      const ageStyle   = dup ? 'color:var(--red);' : '';
+      const phoneStyle = dup ? 'color:var(--red);' : '';
+
+      // Duplicate warning row
+      const dupRow = dup && st !== 'APPROVED' && st !== 'REJECTED'
+        ? `<tr style="background:rgba(255,61,61,0.06);">
+            <td colspan="9" style="padding:6px 14px 8px 22px;">
+              <div style="font-family:'Share Tech Mono';font-size:0.58rem;color:var(--red);letter-spacing:0.06em;display:flex;align-items:center;gap:8px;">
+                <span style="opacity:0.7;">⚠</span>
+                <span>DUPLICATE DETECTED — Name <strong>${r.name}</strong>, Age <strong>${r.age||'—'}</strong>, Phone <strong>${r.contact||'—'}</strong> already exists in an active/approved report.
+                Admin approval required to confirm this is a new case.</span>
+              </div>
+            </td>
+           </tr>`
+        : '';
+
+      // Action buttons
+      let actionCell;
+      if (st === 'APPROVED') {
+        actionCell = `<span style="color:var(--green);font-family:'Share Tech Mono';font-size:0.58rem;">✓ APPROVED</span>`;
+      } else if (st === 'REJECTED') {
+        actionCell = `<span style="color:var(--sub);font-family:'Share Tech Mono';font-size:0.58rem;">✗ REJECTED</span>`;
+      } else {
+        actionCell = `<button class="approve-btn" onclick="approveMissing('${r.refId}')">✓ APPROVE</button>
+                      <button class="reject-btn"  onclick="rejectMissing('${r.refId}')">✗ REJECT</button>`;
+      }
+
+      return `<tr style="${rowStyle}">
+        <td class="dim">${idx+1}</td>
+        <td><span style="color:var(--cyan);font-family:'Share Tech Mono';font-size:0.62rem;">${r.refId||'—'}</span></td>
+        <td style="${nameStyle}">${r.name||'—'}</td>
+        <td class="dim" style="${ageStyle}">${r.age||'—'}</td>
+        <td style="${phoneStyle}">${r.contact||'—'}</td>
+        <td class="dim" style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.desc||'—'}</td>
+        <td class="dim">${r.timestamp||r.savedAt||'—'}</td>
+        <td>${statusBadge}</td>
+        <td style="white-space:nowrap;">${actionCell}</td>
+      </tr>${dupRow}`;
+    }).join('');
+  }
+
+  window.approveMissing = async function(refId) {
+    const fbKey = reportKeys[refId];
+    if (!fbKey) return;
+    await update(ref(db, 'vayu_rescue/disaster_reports/' + fbKey), { status: 'APPROVED', approvedAt: new Date().toISOString() });
+  };
+
+  window.rejectMissing = async function(refId) {
+    const fbKey = reportKeys[refId];
+    if (!fbKey) return;
+    await update(ref(db, 'vayu_rescue/disaster_reports/' + fbKey), { status: 'REJECTED' });
+  };
+
+  window.exportMissingCSV = function() {
+    const list = getMissingReports();
+    const headers = ['RefID','Name','Age','Contact/Phone','Description','Location','Timestamp','Status','IsDuplicate'];
+    const rows = list.map(r => [r.refId,r.name,r.age,r.contact,r.desc,r.location||r.loc,r.timestamp||r.savedAt,r.status||'ACTIVE',isDuplicate(r,allReports)?'YES':'NO']);
+    const csv = [headers,...rows].map(row=>row.map(v=>'"'+(v||'').toString().replace(/"/g,'""')+'"').join(',')).join('\n');
+    const blob = new Blob([csv],{type:'text/csv'});
+    const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='vayu_rescue_missing_reports_'+Date.now()+'.csv'; a.click();
+  };
+
+  // ══════════════════════════════
+  // MISSION SIDEBAR LIST
+  // ══════════════════════════════
+  function renderMissionList() {
+    const el = document.getElementById('mission-list');
+    if (!el) return;
+    // Only disaster reports (VR-) go in the drone dispatch sidebar
+    const disasterReports = allReports.filter(r => r.refId && r.refId.startsWith('VR-'));
+    if (!disasterReports.length) {
+      el.innerHTML = '<div class="empty-state" style="padding:28px 12px;"><span class="empty-icon">📋</span>No disaster reports yet</div>';
+      return;
+    }
+    const sorted = [...disasterReports].sort((a,b) => {
+      const o = { ACTIVE: 0, APPROVED: 1, REJECTED: 2 };
+      return (o[a.status]??0) - (o[b.status]??0);
+    });
+    el.innerHTML = sorted.map(r => {
+      const st = r.status || 'ACTIVE';
+      const badgeCls = st === 'APPROVED' ? 'mc-approved' : st === 'REJECTED' ? 'mc-rejected' : 'mc-pending';
+      const badgeTxt = st === 'APPROVED' ? '✓ APPROVED' : st === 'REJECTED' ? '✗ REJECTED' : '⌛ PENDING';
+      const actions = st !== 'APPROVED' && st !== 'REJECTED'
+        ? `<div class="mc-actions">
+             <button class="mc-approve-btn" onclick="event.stopPropagation();approveReport('${r.refId}')">✓ APPROVE &amp; DISPATCH</button>
+             <button class="mc-reject-btn"  onclick="event.stopPropagation();rejectReport('${r.refId}')">✗</button>
+           </div>`
+        : st === 'APPROVED'
+          ? (() => {
+              if (!r.lat) return `<div style="font-family:'Share Tech Mono';font-size:0.52rem;color:var(--green);margin-top:4px;">🚁 Drone dispatched · geocoding…</div>`;
+              const d = haversineKm(BASE_LAT, BASE_LNG, r.lat, r.lng);
+              return d <= 10
+                ? `<div style="font-family:'Share Tech Mono';font-size:0.52rem;color:var(--green);margin-top:4px;">🚁 Drone dispatched · ${d.toFixed(1)} km · mapped</div>`
+                : `<div style="font-family:'Share Tech Mono';font-size:0.52rem;color:var(--amber);margin-top:4px;">⚠ Out of range · ${d.toFixed(1)} km &gt; 10 km · not mapped</div>`;
+            })()
+          : `<div style="font-family:'Share Tech Mono';font-size:0.52rem;color:var(--sub);margin-top:4px;">Report dismissed</div>`;
+      return `<div class="mission-card ${st==='APPROVED'?'appr':''}" id="mc-${r.refId}" onclick="focusMission('${r.refId}')">
+        <span class="mc-badge ${badgeCls}">${badgeTxt}</span>
+        <div class="mc-refid">${r.refId}</div>
+        <div class="mc-name">${r.name || (r.disasterType ? r.disasterType + ' Report' : 'Report')}</div>
+        <div class="mc-loc">📍 ${r.location || r.loc || 'Location unknown'}</div>
+        ${actions}
+      </div>`;
+    }).join('');
+  }
+
+  window.focusMission = function(refId) {
+    document.querySelectorAll('.mission-card').forEach(c => c.classList.remove('sel'));
+    const card = document.getElementById('mc-' + refId);
+    if (card) card.classList.add('sel');
+    if (!droneMap) return;
+    const pin = missionPins[refId] || pendingPins[refId];
+    if (pin) {
+      const latlng = pin.marker ? pin.marker.getLatLng() : pin.getLatLng();
+      droneMap.flyTo(latlng, 14, { animate:true, duration:0.8 });
+      setTimeout(() => { if (pin.marker) pin.marker.openPopup(); else pin.openPopup(); }, 900);
+    }
+  };
+
+  // ══════════════════════════════
+  // MAP INIT
+  // ══════════════════════════════
+  function ensureMap() {
+    if (mapReady) { droneMap && droneMap.invalidateSize(); return; }
+    const el = document.getElementById('drone-map');
+    if (!el) return;
+
+    droneMap = L.map('drone-map', { center:[BASE_LAT, BASE_LNG], zoom:13, zoomControl:true });
+
+    // Dark CartoDB tiles
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution:'© OpenStreetMap contributors © CARTO',
+      subdomains:'abcd', maxZoom:19
+    }).addTo(droneMap);
+
+    // ── Drone base marker (orange crosshair) ──
+    const baseIcon = L.divIcon({
+      className:'',
+      html:`<svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="22" cy="22" r="20" fill="rgba(255,153,51,0.12)" stroke="#FF9933" stroke-width="2" stroke-dasharray="4 3"/>
+        <circle cx="22" cy="22" r="7" fill="#FF9933" opacity="0.9"/>
+        <circle cx="22" cy="22" r="3" fill="#fff"/>
+        <line x1="2"  y1="22" x2="13" y2="22" stroke="#FF9933" stroke-width="2.5"/>
+        <line x1="31" y1="22" x2="42" y2="22" stroke="#FF9933" stroke-width="2.5"/>
+        <line x1="22" y1="2"  x2="22" y2="13" stroke="#FF9933" stroke-width="2.5"/>
+        <line x1="22" y1="31" x2="22" y2="42" stroke="#FF9933" stroke-width="2.5"/>
+      </svg>`,
+      iconSize:[44,44], iconAnchor:[22,22]
+    });
+
+    L.marker([BASE_LAT, BASE_LNG], { icon:baseIcon }).addTo(droneMap)
+      .bindPopup(`<div>
+        <div style="color:#FF9933;font-weight:700;font-size:0.75rem;letter-spacing:0.1em;margin-bottom:6px;">🚁 VAYU-RESCUE DRONE BASE</div>
+        <div style="color:#8892B0;font-size:0.62rem;">Lat: ${BASE_LAT.toFixed(6)}<br>Lng: ${BASE_LNG.toFixed(6)}</div>
+        <div style="color:#00d4ff;font-size:0.58rem;margin-top:8px;border-top:1px solid rgba(0,212,255,0.2);padding-top:6px;">STATUS: STANDBY · READY FOR DISPATCH</div>
+      </div>`);
+
+    mapReady = true;
+    syncAllPins();
+  }
+
+  // ══════════════════════════════
+  // SYNC ALL PINS
+  // ══════════════════════════════
+  function syncAllPins() {
+    if (!mapReady || !droneMap) return;
+    // Only disaster reports (VR-) are dispatched on the drone map
+    allReports.filter(r => r.refId && r.refId.startsWith('VR-')).forEach(r => {
+      if (r.status === 'APPROVED') {
+        if (pendingPins[r.refId]) { droneMap.removeLayer(pendingPins[r.refId]); delete pendingPins[r.refId]; }
+        if (r.lat && r.lng && !missionPins[r.refId]) {
+          // Only mark on map if within 10km of drone base
+          const dist = haversineKm(BASE_LAT, BASE_LNG, r.lat, r.lng);
+          if (dist <= 10) {
+            addMissionPin(r);
+          } else {
+            console.log('[Map] Skipping pin for ' + r.refId + ' — ' + dist.toFixed(1) + ' km > 10 km range');
+          }
+        }
+      } else if (r.status === 'REJECTED' || r.status === 'GEO_CONFLICT') {
+        if (pendingPins[r.refId]) { droneMap.removeLayer(pendingPins[r.refId]); delete pendingPins[r.refId]; }
+        if (missionPins[r.refId]) {
+          droneMap.removeLayer(missionPins[r.refId].marker);
+          if (missionPins[r.refId].line) droneMap.removeLayer(missionPins[r.refId].line);
+          delete missionPins[r.refId];
+        }
+      }
+    });
+  }
+
+  function addMissionPin(r) {
+    const targetIcon = L.divIcon({
+      className:'',
+      html:`<svg width="32" height="42" viewBox="0 0 32 42" xmlns="http://www.w3.org/2000/svg">
+        <path d="M16 0C7.16 0 0 7.16 0 16c0 11.5 16 26 16 26S32 27.5 32 16C32 7.16 24.84 0 16 0z" fill="rgba(0,200,83,0.88)" stroke="#00c853" stroke-width="1.5"/>
+        <circle cx="16" cy="16" r="8" fill="none" stroke="white" stroke-width="2"/>
+        <circle cx="16" cy="16" r="3.5" fill="white"/>
+      </svg>`,
+      iconSize:[32,42], iconAnchor:[16,42], popupAnchor:[0,-44]
+    });
+
+    const dist = haversineKm(BASE_LAT, BASE_LNG, r.lat, r.lng);
+    const eta  = Math.round(dist / 80 * 60);
+
+    const marker = L.marker([r.lat, r.lng], { icon:targetIcon }).addTo(droneMap)
+      .bindPopup(`<div style="min-width:220px;">
+        <div style="background:#00c853;color:#000;padding:7px 12px;margin:-12px -12px 10px;font-weight:700;font-size:0.7rem;letter-spacing:0.05em;">
+          ✅ APPROVED MISSION · ${r.refId}
+        </div>
+        <div style="font-size:0.78rem;font-weight:700;margin-bottom:4px;">${r.name||'—'}</div>
+        ${r.disasterType ? `<div style="color:#FF9933;font-size:0.62rem;margin-bottom:3px;">⚠ ${r.disasterType.toUpperCase()}${r.severity ? ' · ' + r.severity : ''}</div>` : ''}
+        <div style="color:#8892B0;font-size:0.62rem;margin-bottom:6px;">📍 ${r.location||'—'}</div>
+        ${r.desc ? `<div style="color:#8892B0;font-size:0.6rem;border-top:1px solid rgba(255,255,255,0.07);padding-top:6px;margin-bottom:6px;">${r.desc}</div>` : ''}
+        <div style="color:#00d4ff;font-size:0.6rem;border-top:1px solid rgba(0,212,255,0.15);padding-top:6px;">
+          📏 Distance from base: <strong>${dist.toFixed(1)} km</strong> <span style="color:#00c853;">(within 10 km range ✓)</span><br>
+          ⏱ Est. drone ETA: <strong>~${eta} min</strong>
+        </div>
+      </div>`);
+
+    // Dashed flight path line from base to target
+    const line = L.polyline([[BASE_LAT, BASE_LNG],[r.lat, r.lng]], {
+      color:'#00c853', weight:2, opacity:0.55, dashArray:'7 9'
+    }).addTo(droneMap);
+
+    missionPins[r.refId] = { marker, line };
+  }
+
+  // ══════════════════════════════
+  // HAVERSINE DISTANCE
+  // ══════════════════════════════
+  function haversineKm(lat1,lng1,lat2,lng2) {
+    const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLng=(lng2-lng1)*Math.PI/180;
+    const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  }
+
+  // ══════════════════════════════
+  // SEARCH + REFRESH
+  // ══════════════════════════════
+  window.filterPersons = function() {
+    const q = document.getElementById('search-persons').value.toLowerCase();
+    renderPersons(allPersons.filter(p => (p.id||'').toLowerCase().includes(q)||(p.timestamp||'').toLowerCase().includes(q)||(p.source||'').toLowerCase().includes(q)));
+  };
+  window.filterReports = function() {
+    const q = document.getElementById('search-reports').value.toLowerCase();
+    renderReports(allReports.filter(r => (r.name||'').toLowerCase().includes(q)||(r.location||'').toLowerCase().includes(q)||(r.refId||'').toLowerCase().includes(q)||(r.desc||'').toLowerCase().includes(q)));
+  };
+  window.loadPersons = function() { renderPersons(allPersons); };
+  window.loadReports = function() { renderReports(allReports); };
+
+  // ══════════════════════════════
+  // CSV EXPORT
+  // ══════════════════════════════
+  window.exportCSV = function(type) {
+    let rows, headers, filename;
+    if (type === 'persons') {
+      headers = ['ID','Timestamp','Source','BBox_X','BBox_Y','BBox_W','BBox_H','HasPhoto','SavedAt'];
+      rows = allPersons.map(p => [p.id,p.timestamp,p.source,p.bbox_x,p.bbox_y,p.bbox_w,p.bbox_h,p.thumb?'YES':'NO',p.savedAt]);
+      filename = 'vayu_rescue_persons_' + Date.now() + '.csv';
+    } else {
+      headers = ['RefID','Name','Age','Location','Lat','Lng','Description','DisasterType','Severity','Contact','Timestamp','Status'];
+      rows = allReports.map(r => [r.refId,r.name,r.age,r.location,r.lat||'',r.lng||'',r.desc,r.disasterType||'',r.severity||'',r.contact,r.timestamp,r.status]);
+      filename = 'vayu_rescue_reports_' + Date.now() + '.csv';
+    }
+    const csv = [headers,...rows].map(r=>r.map(v=>'"'+(v||'').toString().replace(/"/g,'""')+'"').join(',')).join('\n');
+    const blob = new Blob([csv],{type:'text/csv'});
+    const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
+  };
+</script>
+</body>
+</html>
